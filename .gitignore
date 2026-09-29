@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# project
+corpus/
+yc-docs/
+data/corpus.jsonl
+qdrant_storage/
+langflow_data/
