@@ -25,9 +25,11 @@ class QdrantSearch(Component):
         MultilineInput(name="query_instruction", display_name="Query Instruction", value="", advanced=True),
     ]
 
+    # group_outputs=True: оба выхода видны в интерфейсе одновременно; без этого фронтенд Langflow
+    # показывает только выбранный выход и при сохранении потока удаляет связь от второго
     outputs = [
-        Output(display_name="Context", name="context", method="build_context"),
-        Output(display_name="Sources", name="sources", method="build_sources"),
+        Output(display_name="Context", name="context", method="build_context", group_outputs=True),
+        Output(display_name="Sources", name="sources", method="build_sources", group_outputs=True),
     ]
 
     def _hits(self):

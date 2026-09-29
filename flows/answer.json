@@ -950,7 +950,7 @@
                 "list": false,
                 "show": true,
                 "multiline": true,
-                "value": "from lfx.custom.custom_component.component import Component\nfrom lfx.io import HandleInput, IntInput, MessageTextInput, MultilineInput, Output, StrInput\nfrom lfx.schema.message import Message\nfrom qdrant_client import QdrantClient\n\n\nclass QdrantSearch(Component):\n    \"\"\"Поиск top_k чанков в коллекции Qdrant по эмбеддингу вопроса.\n\n    Компонент Qdrant вынесен из Langflow 1.12 в отдельный пакет, которого нет в образе,\n    поэтому поиск реализован здесь напрямую через qdrant-client.\n    \"\"\"\n\n    display_name = \"Qdrant Search\"\n    description = \"Ищет ближайшие чанки в коллекции Qdrant (cosine).\"\n    icon = \"database\"\n    name = \"QdrantSearch\"\n\n    inputs = [\n        MessageTextInput(name=\"query\", display_name=\"Query\", required=True),\n        HandleInput(name=\"embedding\", display_name=\"Embedding\", input_types=[\"Embeddings\"], required=True),\n        StrInput(name=\"collection_name\", display_name=\"Collection\", value=\"yc_c1000\"),\n        StrInput(name=\"qdrant_url\", display_name=\"Qdrant URL\", value=\"http://qdrant:6333\"),\n        IntInput(name=\"top_k\", display_name=\"Top K\", value=5),\n        MultilineInput(name=\"query_instruction\", display_name=\"Query Instruction\", value=\"\", advanced=True),\n    ]\n\n    outputs = [\n        Output(display_name=\"Context\", name=\"context\", method=\"build_context\"),\n        Output(display_name=\"Sources\", name=\"sources\", method=\"build_sources\"),\n    ]\n\n    def _hits(self):\n        if getattr(self, \"_cached_hits\", None) is None:\n            # тот же префикс, что в common.QUERY_INSTRUCTION: документы индексировались без него\n            vector = self.embedding.embed_query(self.query_instruction + self.query)\n            client = QdrantClient(url=self.qdrant_url, timeout=60)\n            self._cached_hits = client.query_points(\n                collection_name=self.collection_name, query=vector, limit=self.top_k, with_payload=True\n            ).points\n        return self._cached_hits\n\n    def build_context(self) -> Message:\n        parts = []\n        for i, h in enumerate(self._hits(), 1):\n            p = h.payload\n            parts.append(f\"[{i}] URL: {p['url']}\\n{p['text']}\")\n        text = \"\\n\\n---\\n\\n\".join(parts)\n        self.status = f\"{len(parts)} чанков из {self.collection_name}\"\n        return Message(text=text)\n\n    def build_sources(self) -> Message:\n        urls = []\n        for h in self._hits():\n            if h.payload[\"url\"] not in urls:\n                urls.append(h.payload[\"url\"])\n        return Message(text=\"\\n\".join(urls))\n",
+                "value": "from lfx.custom.custom_component.component import Component\nfrom lfx.io import HandleInput, IntInput, MessageTextInput, MultilineInput, Output, StrInput\nfrom lfx.schema.message import Message\nfrom qdrant_client import QdrantClient\n\n\nclass QdrantSearch(Component):\n    \"\"\"Поиск top_k чанков в коллекции Qdrant по эмбеддингу вопроса.\n\n    Компонент Qdrant вынесен из Langflow 1.12 в отдельный пакет, которого нет в образе,\n    поэтому поиск реализован здесь напрямую через qdrant-client.\n    \"\"\"\n\n    display_name = \"Qdrant Search\"\n    description = \"Ищет ближайшие чанки в коллекции Qdrant (cosine).\"\n    icon = \"database\"\n    name = \"QdrantSearch\"\n\n    inputs = [\n        MessageTextInput(name=\"query\", display_name=\"Query\", required=True),\n        HandleInput(name=\"embedding\", display_name=\"Embedding\", input_types=[\"Embeddings\"], required=True),\n        StrInput(name=\"collection_name\", display_name=\"Collection\", value=\"yc_c1000\"),\n        StrInput(name=\"qdrant_url\", display_name=\"Qdrant URL\", value=\"http://qdrant:6333\"),\n        IntInput(name=\"top_k\", display_name=\"Top K\", value=5),\n        MultilineInput(name=\"query_instruction\", display_name=\"Query Instruction\", value=\"\", advanced=True),\n    ]\n\n    # group_outputs=True: оба выхода видны в интерфейсе одновременно; без этого фронтенд Langflow\n    # показывает только выбранный выход и при сохранении потока удаляет связь от второго\n    outputs = [\n        Output(display_name=\"Context\", name=\"context\", method=\"build_context\", group_outputs=True),\n        Output(display_name=\"Sources\", name=\"sources\", method=\"build_sources\", group_outputs=True),\n    ]\n\n    def _hits(self):\n        if getattr(self, \"_cached_hits\", None) is None:\n            # тот же префикс, что в common.QUERY_INSTRUCTION: документы индексировались без него\n            vector = self.embedding.embed_query(self.query_instruction + self.query)\n            client = QdrantClient(url=self.qdrant_url, timeout=60)\n            self._cached_hits = client.query_points(\n                collection_name=self.collection_name, query=vector, limit=self.top_k, with_payload=True\n            ).points\n        return self._cached_hits\n\n    def build_context(self) -> Message:\n        parts = []\n        for i, h in enumerate(self._hits(), 1):\n            p = h.payload\n            parts.append(f\"[{i}] URL: {p['url']}\\n{p['text']}\")\n        text = \"\\n\\n---\\n\\n\".join(parts)\n        self.status = f\"{len(parts)} чанков из {self.collection_name}\"\n        return Message(text=text)\n\n    def build_sources(self) -> Message:\n        urls = []\n        for h in self._hits():\n            if h.payload[\"url\"] not in urls:\n                urls.append(h.payload[\"url\"])\n        return Message(text=\"\\n\".join(urls))\n",
                 "fileTypes": [],
                 "file_path": "",
                 "password": false,
@@ -1112,7 +1112,7 @@
                 "required_inputs": null,
                 "allows_loop": false,
                 "loop_types": null,
-                "group_outputs": false,
+                "group_outputs": true,
                 "options": null,
                 "tool_mode": true
               },
@@ -1130,7 +1130,7 @@
                 "required_inputs": null,
                 "allows_loop": false,
                 "loop_types": null,
-                "group_outputs": false,
+                "group_outputs": true,
                 "options": null,
                 "tool_mode": true
               }
@@ -1148,7 +1148,7 @@
             "edited": false,
             "metadata": {
               "module": "custom_components.qdrant_search",
-              "code_hash": "8583ad559d32",
+              "code_hash": "c9df3055fa4d",
               "dependencies": {
                 "total_dependencies": 2,
                 "dependencies": [
@@ -2484,7 +2484,7 @@
   "flow_type": "workflow",
   "a2a_enabled": false,
   "a2a_card_overrides": null,
-  "id": "6dde0e3b-c2af-454b-a279-b195312fa43f",
+  "id": "6eb7fef0-4358-41f2-8bdb-f691c747ba15",
   "workspace_id": null,
   "name_key": null
 }

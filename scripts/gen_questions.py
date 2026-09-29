@@ -24,6 +24,7 @@ from common import ROOT, STRONG_MODEL, chat, load_corpus, model_price, search
 SEED = 42
 PLAN = {"fact": 10, "procedure": 8, "multi": 5, "number": 6, "no_answer": 8, "off_topic": 3}
 HOLDOUT = {"fact": 3, "procedure": 2, "multi": 1, "number": 2, "no_answer": 1, "off_topic": 1}
+HOLDOUT_IDS = {"q05", "q06", "q07", "q11", "q16", "q19", "q25", "q26", "q34", "q38"}
 SERVICES = ["Compute Cloud", "Object Storage", "VPC", "Billing"]
 PAGE_TOKENS = 3500
 COLLECTION = "yc_c1000"
@@ -252,12 +253,14 @@ def estimate(picks):
           f"оценка с множителем x2 и без повторов: ${cost:.4f}")
 
 
-def assign_split(rows, rng):
-    for kind, n in HOLDOUT.items():
-        idx = [i for i, r in enumerate(rows) if r["type"] == kind]
-        hold = set(rng.sample(idx, n))
-        for i in idx:
-            rows[i]["split"] = "holdout" if i in hold else "dev"
+def assign_split(rows):
+    """Holdout задан списком id: при первой генерации он выбран случайно (стратифицированно по типу),
+    но общий генератор случайных чисел зависит от кэша, поэтому список зафиксирован явно.
+    Эти 10 вопросов при проверке эталонов и правке промптов не читались."""
+    for r in rows:
+        r["split"] = "holdout" if r["id"] in HOLDOUT_IDS else "dev"
+    counts = {k: sum(r["type"] == k and r["split"] == "holdout" for r in rows) for k in HOLDOUT}
+    assert counts == HOLDOUT, f"состав holdout не совпал с планом: {counts}"
 
 
 def main():
@@ -305,10 +308,10 @@ def main():
     rows += cached("off_topic", gen_off_topic)
     assert [sum(r["type"] == k for r in rows) for k in PLAN] == list(PLAN.values()), "состав не совпал с планом"
 
-    assign_split(rows, rng)
     for i, r in enumerate(rows, 1):
         r["id"] = f"q{i:02d}"
         r.update(MANUAL_FIXES.get(r["id"], {}))
+    assign_split(rows)
     with OUT.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["id", "type", "question", "gold_answer", "gold_urls", "should_refuse", "split"])
         w.writeheader()
