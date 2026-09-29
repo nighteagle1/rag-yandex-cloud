@@ -6,3 +6,4 @@ python-dotenv>=1.0
 langfuse>=3.0
 tiktoken>=0.7
 requests>=2.31
+numpy>=1.26
