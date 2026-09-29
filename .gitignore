@@ -223,3 +223,4 @@ yc-docs/
 data/corpus.jsonl
 qdrant_storage/
 langflow_data/
+data/emb_cache/
