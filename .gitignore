@@ -224,3 +224,4 @@ data/corpus.jsonl
 qdrant_storage/
 langflow_data/
 data/emb_cache/
+data/gen_cache.json
