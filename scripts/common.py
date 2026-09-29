@@ -113,3 +113,39 @@ def search(query: str, collection: str, top_k: int = 5) -> list[dict]:
     vec = embed([QUERY_INSTRUCTION + query])[0]
     hits = qdrant().query_points(collection_name=collection, query=vec, limit=top_k, with_payload=True).points
     return [{"score": h.score, **h.payload} for h in hits]
+
+
+LANGFLOW_URL = os.getenv("LANGFLOW_URL", "http://localhost:7860").rstrip("/")
+SOURCES_MARKER = "\n\n---\nНайденные страницы:\n"  # как в flows/components/format_answer.py
+
+
+def run_flow(question: str, collection: str | None = None, prompt_text: str | None = None,
+             session_id: str | None = None) -> dict:
+    """Вызов потока Langflow (POST /api/v1/run). Коллекция и промпт переопределяются через tweaks.
+
+    Возвращает ответ модели без списка источников, найденные URL, id трейса Langfuse и время.
+    """
+    from build_flow import IDS  # ленивый импорт: build_flow сам импортирует common
+
+    flow_id = (ROOT / "flows" / "flow_id.txt").read_text(encoding="utf-8").strip()
+    # модели передаются явно: Langflow может сбросить значение не из своего списка моделей OpenAI
+    tweaks = {IDS["search"]: {}, IDS["prompt"]: {}, IDS["embed"]: {"model": EMBED_MODEL},
+              IDS["llm"]: {"model_name": ANSWER_MODEL}}
+    if collection:
+        tweaks[IDS["search"]]["collection_name"] = collection
+    if prompt_text:
+        tweaks[IDS["prompt"]]["template"] = prompt_text
+    tweaks = {k: v for k, v in tweaks.items() if v}
+    body = {"input_value": question, "input_type": "chat", "output_type": "chat", "tweaks": tweaks}
+    if session_id:
+        body["session_id"] = session_id
+    t0 = time.time()
+    r = requests.post(f"{LANGFLOW_URL}/api/v1/run/{flow_id}", json=body, timeout=300)
+    r.raise_for_status()
+    msg = r.json()["outputs"][0]["outputs"][0]["results"]["message"]
+    text = msg["text"]
+    answer, _, sources = text.partition(SOURCES_MARKER)
+    urls = [u.strip().removeprefix("- ").strip() for u in sources.splitlines() if u.strip()]
+    meta = msg.get("session_metadata") or msg.get("data", {}).get("session_metadata") or {}
+    return {"answer": answer.strip(), "urls": urls, "raw": text, "trace_id": meta.get("langfuse_trace_id"),
+            "run_id": msg.get("run_id"), "latency_s": round(time.time() - t0, 2)}
