@@ -226,3 +226,6 @@ langflow_data/
 data/emb_cache/
 data/gen_cache.json
 data/results/*_ctx.jsonl
+CLAUDE.md
+project_status.md
+plan.md
